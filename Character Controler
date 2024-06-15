@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    public float mouseSensitivity = 100f;
+    public float mouseSensitivity = 5f;
     public float smoothness = 5f;
     public float jumpForce = 5f;
     public float crouchSpeed = 2f;
@@ -13,13 +13,18 @@ public class PlayerController : MonoBehaviour
     private Transform cameraTransform;
     private CharacterController controller;
     private float pitch = 0f;
-    private float speed = 5f; // Initial default speed
+    private float speed; // Current movement speed
+    private float verticalVelocity; // Vertical velocity for jumping
 
     void Start()
     {
+        Cursor.lockState = CursorLockMode.Locked; // Lock cursor initially
+        Cursor.visible = false; // Hide cursor initially
+
         cameraTransform = Camera.main.transform;
         controller = GetComponent<CharacterController>();
         defaultCameraOffset = cameraTransform.localPosition;
+        speed = defaultSpeed; // Initialize the speed to the default speed
     }
 
     void Update()
@@ -51,21 +56,33 @@ public class PlayerController : MonoBehaviour
         // Sprint mechanic
         if (sprint)
         {
-            speed = Mathf.Min(speed * 2f, 10f); // Limit the maximum speed to 10
+            speed = Mathf.Min(defaultSpeed * 2f, 10f); // Limit the maximum speed to 10
         }
-        else
+        else if (!crouch) // Ensure not to reset speed if crouching
         {
             speed = defaultSpeed; // Reset speed to default value
         }
 
         // Calculate move direction relative to camera's forward direction
         Vector3 moveDirection = cameraTransform.forward * moveZ + cameraTransform.right * moveX;
+        moveDirection = moveDirection.normalized * speed;
 
         // Jumping
-        if (Input.GetButtonDown("Jump") && controller.isGrounded)
+        if (controller.isGrounded)
         {
-            moveDirection.y = jumpForce;
+            verticalVelocity = -0.5f; // Small downward force to keep grounded
+
+            if (Input.GetButtonDown("Jump"))
+            {
+                verticalVelocity = jumpForce;
+            }
         }
+        else
+        {
+            verticalVelocity += Physics.gravity.y * Time.deltaTime; // Apply gravity when not grounded
+        }
+
+        moveDirection.y = verticalVelocity;
 
         // Crouching
         if (crouch)
@@ -75,12 +92,11 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            speed = defaultSpeed; // Reset speed to default value
             cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, defaultCameraOffset, smoothness * Time.deltaTime);
         }
 
         // Apply movement with Time.deltaTime
-        controller.Move(moveDirection.normalized * speed * Time.deltaTime);
+        controller.Move(moveDirection * Time.deltaTime);
 
         // Handle cursor locking and visibility
         HandleCursor();
@@ -88,6 +104,11 @@ public class PlayerController : MonoBehaviour
 
     void HandleCursor()
     {
-        // Implement your cursor handling logic here
+        // Toggle cursor visibility and lock state when Escape key is pressed
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Cursor.visible = !Cursor.visible;
+            Cursor.lockState = Cursor.visible ? CursorLockMode.None : CursorLockMode.Locked;
+        }
     }
 }
