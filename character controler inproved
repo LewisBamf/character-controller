@@ -1,0 +1,106 @@
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    public float mouseSensitivity = 100f;
+    public float smoothness = 5f;
+    public float jumpForce = 5f;
+    public float crouchSpeed = 2f;
+    public float defaultSpeed = 5f;
+    public Vector3 crouchCameraOffset = new Vector3(0f, -0.5f, 0f); // Adjusted y position for crouch
+    private Vector3 defaultCameraOffset;
+
+    private Transform cameraTransform;
+    private CharacterController controller;
+    private float pitch = 0f;
+    private float speed; // Current movement speed
+    private float verticalVelocity; // Vertical velocity for jumping
+
+    void Start()
+    {
+        cameraTransform = Camera.main.transform;
+        controller = GetComponent<CharacterController>();
+        defaultCameraOffset = cameraTransform.localPosition;
+        speed = defaultSpeed; // Initialize the speed to the default speed
+    }
+
+    void Update()
+    {
+        if (cameraTransform == null)
+        {
+            return; // Exit if the cameraTransform is not set
+        }
+
+        // Mouse input for looking around
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+
+        // Smooth camera rotation
+        pitch -= mouseY;
+        pitch = Mathf.Clamp(pitch, -90f, 90f);
+        Quaternion targetRotation = Quaternion.Euler(pitch, 0f, 0f);
+        cameraTransform.localRotation = Quaternion.Slerp(cameraTransform.localRotation, targetRotation, smoothness * Time.deltaTime);
+
+        // Rotate the character based on the mouse movement
+        transform.Rotate(Vector3.up * mouseX);
+
+        // Movement input
+        float moveX = Input.GetAxisRaw("Horizontal");
+        float moveZ = Input.GetAxisRaw("Vertical");
+        bool sprint = Input.GetKey(KeyCode.LeftShift);
+        bool crouch = Input.GetKey(KeyCode.LeftControl);
+
+        // Sprint mechanic
+        if (sprint)
+        {
+            speed = Mathf.Min(defaultSpeed * 2f, 10f); // Limit the maximum speed to 10
+        }
+        else if (!crouch) // Ensure not to reset speed if crouching
+        {
+            speed = defaultSpeed; // Reset speed to default value
+        }
+
+        // Calculate move direction relative to camera's forward direction
+        Vector3 moveDirection = cameraTransform.forward * moveZ + cameraTransform.right * moveX;
+        moveDirection = moveDirection.normalized * speed;
+
+        // Jumping
+        if (controller.isGrounded)
+        {
+            verticalVelocity = -0.5f; // Small downward force to keep grounded
+
+            if (Input.GetButtonDown("Jump"))
+            {
+                verticalVelocity = jumpForce;
+            }
+        }
+        else
+        {
+            verticalVelocity += Physics.gravity.y * Time.deltaTime; // Apply gravity when not grounded
+        }
+
+        moveDirection.y = verticalVelocity;
+
+        // Crouching
+        if (crouch)
+        {
+            speed = crouchSpeed; // Reduce speed when crouching
+            cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, crouchCameraOffset, smoothness * Time.deltaTime);
+        }
+        else
+        {
+            cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, defaultCameraOffset, smoothness * Time.deltaTime);
+        }
+
+        // Apply movement with Time.deltaTime
+        controller.Move(moveDirection * Time.deltaTime);
+
+        // Handle cursor locking and visibility
+        HandleCursor();
+    }
+
+    void HandleCursor()
+    {
+        // Implement your cursor handling logic here
+    }
+}
